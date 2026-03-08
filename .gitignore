@@ -1,0 +1,4 @@
+.env
+/quiz-questions
+/venv
+.DS_Store
