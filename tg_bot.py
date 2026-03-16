@@ -13,43 +13,11 @@ from telegram.ext import (
     ConversationHandler,
 )
 
-
-def load_questions_from_file(file_path):
-    with open(file_path, "r", encoding="koi8-r") as file:
-        content = file.read()
-
-    blocks = content.split("\n\n")
-    questions_answers = {}
-    question = None
-
-    for block in blocks:
-        if block.startswith("Вопрос"):
-            question = block.split(":\n", 1)[1].strip()
-        elif block.startswith("Ответ") and question:
-            answer = block.split(":\n", 1)[1].strip()
-            questions_answers[question] = answer
-
-    return questions_answers
+from quiz_questions import load_questions_from_directory, clean_answer
 
 
-def load_questions_from_directory(directory_path):
-    all_questions_answers = {}
-
-    for filename in os.listdir(directory_path):
-        if not filename.endswith(".txt"):
-            continue
-
-        file_path = os.path.join(directory_path, filename)
-        file_questions = load_questions_from_file(file_path)
-        all_questions_answers.update(file_questions)
-
-    return all_questions_answers
-
-
-def clean_answer(answer):
-    answer = answer.split(".")[0]
-    answer = answer.split("(")[0]
-    return answer.strip().lower()
+redis_client = None
+questions_answers = {}
 
 
 class BotStates(Enum):
@@ -71,9 +39,10 @@ def start(update, context):
 
 def handle_new_question_request(update, context):
     chat_id = update.message.chat_id
+    user_key = f"tg-{chat_id}"
     question = random.choice(list(questions_answers.keys()))
 
-    redis_client.set(chat_id, question)
+    redis_client.set(user_key, question)
     update.message.reply_text(question)
 
     return BotStates.QUIZ
@@ -81,9 +50,10 @@ def handle_new_question_request(update, context):
 
 def handle_solution_attempt(update, context):
     chat_id = update.message.chat_id
+    user_key = f"tg-{chat_id}"
     user_answer = update.message.text.strip().lower()
 
-    question = redis_client.get(chat_id)
+    question = redis_client.get(user_key)
 
     if not question:
         update.message.reply_text("Сначала нажмите «Новый вопрос».")
@@ -104,7 +74,8 @@ def handle_solution_attempt(update, context):
 
 def handle_give_up(update, context):
     chat_id = update.message.chat_id
-    question = redis_client.get(chat_id)
+    user_key = f"tg-{chat_id}"
+    question = redis_client.get(user_key)
 
     if not question:
         update.message.reply_text("Сначала нажмите «Новый вопрос».")
@@ -114,7 +85,7 @@ def handle_give_up(update, context):
     update.message.reply_text(f"Правильный ответ: {correct_answer}")
 
     new_question = random.choice(list(questions_answers.keys()))
-    redis_client.set(chat_id, new_question)
+    redis_client.set(user_key, new_question)
     update.message.reply_text(new_question)
 
     return BotStates.QUIZ
@@ -131,14 +102,13 @@ def main():
     load_dotenv()
 
     tg_token = os.environ["TG_BOT_TOKEN"]
-    questions_path = os.environ["QUESTIONS_PATH"]
     redis_url = os.environ["REDIS_URL"]
+    questions_path = os.environ["QUESTIONS_PATH"]
 
     redis_client = redis.from_url(
         redis_url,
         decode_responses=True,
     )
-
     questions_answers = load_questions_from_directory(questions_path)
 
     updater = Updater(tg_token, use_context=True)
