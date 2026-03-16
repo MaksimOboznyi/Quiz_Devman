@@ -126,11 +126,13 @@ def handle_score(update, context):
 
 
 def main():
+    global redis_client, questions_answers
+
     load_dotenv()
 
-    tg_token = os.getenv("TG_BOT_TOKEN")
-    questions_path = os.getenv("QUESTIONS_PATH", "quiz-questions")
-    redis_url = os.getenv("REDIS_URL")
+    tg_token = os.environ["TG_BOT_TOKEN"]
+    questions_path = os.environ["QUESTIONS_PATH"]
+    redis_url = os.environ["REDIS_URL"]
 
     redis_client = redis.from_url(
         redis_url,
@@ -138,6 +140,7 @@ def main():
     )
 
     questions_answers = load_questions_from_directory(questions_path)
+
     updater = Updater(tg_token, use_context=True)
     dispatcher = updater.dispatcher
 

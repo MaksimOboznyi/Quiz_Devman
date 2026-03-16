@@ -35,9 +35,9 @@ def clean_answer(answer):
 def main():
     load_dotenv()
 
-    vk_token = os.getenv("VK_BOT_TOKEN")
-    redis_url = os.getenv("REDIS_URL")
-    questions_path = os.getenv("QUESTIONS_PATH")
+    vk_token = os.environ["VK_BOT_TOKEN"]
+    redis_url = os.environ["REDIS_URL"]
+    questions_path = os.environ["QUESTIONS_PATH"]
 
     redis_client = redis.from_url(redis_url, decode_responses=True)
 
