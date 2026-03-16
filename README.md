@@ -28,43 +28,47 @@ https://vk.com/YOUR_GROUP
 
 ## Как запустить локально
 
-1. Клонировать репозиторий
+### 1. Клонировать репозиторий
 
-'''bash
-git clone https://github.com/MaksimObozniy/Quiz_Devman.git
+```bash
+git clone https://github.com/MaksimOboznyi/Quiz_Devman.git
 
 cd Quiz_Devman
-'''
+```
 
-2. Создать виртуальное окружение
+### 2. Создать виртуальное окружение
 
-'''bash
+```bash
 python3.9 -m venv venv
 source venv/bin/activate
-'''
+```
 
-3. Установить зависимости
+### 3. Установить зависимости
 
-'''bash
+```bash
 pip install -r requirements.txt
-'''
+```
 
-4. Создать файл '.env'
+### 4. Создать файл '.env'
 
 TG_BOT_TOKEN=your_token
+
 VK_TOKEN=your_vk_token
+
 REDIS_URL=your_redis_url
+
 QUESTIONS_PATH=question_path
 
 
-5. Запустить бота
+### 5. Запустить бота
 
 Telegram бот:
-
+```
 python tg_bot.py
-
+```
 ----------------------------
 
 VK бот:
-
+```
 python vk_bot.py
+```
