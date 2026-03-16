@@ -14,13 +14,6 @@ from telegram.ext import (
 )
 
 
-load_dotenv()
-
-TG_TOKEN = os.getenv("TG_BOT_TOKEN")
-QUESTIONS_PATH = os.getenv("QUESTIONS_PATH", "quiz-questions")
-REDIS_URL = os.getenv("REDIS_URL")
-
-
 def load_questions_from_file(file_path):
     with open(file_path, "r", encoding="koi8-r") as file:
         content = file.read()
@@ -61,14 +54,6 @@ def clean_answer(answer):
 
 class BotStates(Enum):
     QUIZ = 1
-
-
-redis_client = redis.from_url(
-    REDIS_URL,
-    decode_responses=True,
-)
-
-questions_answers = load_questions_from_directory(QUESTIONS_PATH)
 
 
 def start(update, context):
@@ -141,7 +126,19 @@ def handle_score(update, context):
 
 
 def main():
-    updater = Updater(TG_TOKEN, use_context=True)
+    load_dotenv()
+
+    tg_token = os.getenv("TG_BOT_TOKEN")
+    questions_path = os.getenv("QUESTIONS_PATH", "quiz-questions")
+    redis_url = os.getenv("REDIS_URL")
+
+    redis_client = redis.from_url(
+        redis_url,
+        decode_responses=True,
+    )
+
+    questions_answers = load_questions_from_directory(questions_path)
+    updater = Updater(tg_token, use_context=True)
     dispatcher = updater.dispatcher
 
     conv_handler = ConversationHandler(

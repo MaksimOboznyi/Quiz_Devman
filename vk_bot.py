@@ -8,36 +8,6 @@ from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from vk_api.longpoll import VkEventType, VkLongPoll
 
 
-load_dotenv()
-
-VK_TOKEN = os.getenv("VK_BOT_TOKEN")
-REDIS_URL = os.getenv("REDIS_URL")
-QUESTIONS_PATH = os.getenv("QUESTIONS_PATH")
-
-redis_client = redis.from_url(REDIS_URL, decode_responses=True)
-
-questions_answers = {}
-
-for filename in os.listdir(QUESTIONS_PATH):
-    with open(os.path.join(QUESTIONS_PATH, filename), "r", encoding="koi8-r") as file:
-        content = file.read()
-
-    blocks = content.split("\n\n")
-    question = None
-
-    for block in blocks:
-        if block.startswith("Вопрос"):
-            question = block.split(":\n", 1)[1].strip()
-        elif block.startswith("Ответ") and question:
-            answer = block.split(":\n", 1)[1].strip()
-            questions_answers[question] = answer
-
-
-vk_session = vk_api.VkApi(token=VK_TOKEN)
-vk = vk_session.get_api()
-longpoll = VkLongPoll(vk_session)
-
-
 def get_keyboard():
     keyboard = VkKeyboard(one_time=False)
     keyboard.add_button("Новый вопрос", color=VkKeyboardColor.PRIMARY)
@@ -63,6 +33,36 @@ def clean_answer(answer):
 
 
 def main():
+    load_dotenv()
+
+    vk_token = os.getenv("VK_BOT_TOKEN")
+    redis_url = os.getenv("REDIS_URL")
+    questions_path = os.getenv("QUESTIONS_PATH")
+
+    redis_client = redis.from_url(redis_url, decode_responses=True)
+
+    questions_answers = {}
+
+    for filename in os.listdir(questions_path):
+        with open(os.path.join(questions_path, filename), "r", encoding="koi8-r") as file:
+            content = file.read()
+
+    blocks = content.split("\n\n")
+    question = None
+
+    for block in blocks:
+        if block.startswith("Вопрос"):
+            question = block.split(":\n", 1)[1].strip()
+        elif block.startswith("Ответ") and question:
+            answer = block.split(":\n", 1)[1].strip()
+            questions_answers[question] = answer
+
+
+    vk_session = vk_api.VkApi(token=vk_token)
+    vk = vk_session.get_api()
+    longpoll = VkLongPoll(vk_session)
+
+
     for event in longpoll.listen():
         if event.type == VkEventType.MESSAGE_NEW and event.to_me:
 
