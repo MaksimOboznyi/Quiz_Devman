@@ -10,12 +10,6 @@ from vk_api.longpoll import VkEventType, VkLongPoll
 from quiz_questions import load_questions_from_directory, clean_answer
 
 
-vk = None
-longpoll = None
-redis_client = None
-questions_answers = {}
-
-
 def get_keyboard():
     keyboard = VkKeyboard(one_time=False)
     keyboard.add_button("Новый вопрос", color=VkKeyboardColor.PRIMARY)
@@ -25,18 +19,7 @@ def get_keyboard():
     return keyboard.get_keyboard()
 
 
-def send_message(user_id, text):
-    vk.messages.send(
-        user_id=user_id,
-        message=text,
-        random_id=0,
-        keyboard=get_keyboard(),
-    )
-
-
 def main():
-    global vk, longpoll, redis_client, questions_answers
-
     load_dotenv()
 
     vk_token = os.environ["VK_BOT_TOKEN"]
@@ -49,6 +32,14 @@ def main():
     vk_session = vk_api.VkApi(token=vk_token)
     vk = vk_session.get_api()
     longpoll = VkLongPoll(vk_session)
+
+    def send_message(user_id, text):
+        vk.messages.send(
+            user_id=user_id,
+            message=text,
+            random_id=0,
+            keyboard=get_keyboard(),
+        )
 
     for event in longpoll.listen():
         if event.type != VkEventType.MESSAGE_NEW or not event.to_me:
