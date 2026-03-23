@@ -1,6 +1,7 @@
 import os
 import random
 from enum import Enum
+from functools import partial
 
 import redis
 from dotenv import load_dotenv
@@ -33,6 +34,61 @@ def start(update, context):
     )
 
 
+def handle_new_question_request(redis_client, questions_answers, update, context):
+    chat_id = update.message.chat_id
+    user_key = f"tg-{chat_id}"
+
+    question = random.choice(list(questions_answers.keys()))
+    redis_client.set(user_key, question)
+
+    update.message.reply_text(question)
+    return BotStates.QUIZ
+
+
+def handle_solution_attempt(redis_client, questions_answers, update, context):
+    chat_id = update.message.chat_id
+    user_key = f"tg-{chat_id}"
+    user_answer = update.message.text.strip().lower()
+
+    question = redis_client.get(user_key)
+
+    if not question:
+        update.message.reply_text("Сначала нажмите «Новый вопрос».")
+        return ConversationHandler.END
+
+    correct_answer = questions_answers[question]
+    cleaned_correct_answer = clean_answer(correct_answer)
+
+    if user_answer in cleaned_correct_answer:
+        update.message.reply_text(
+            "Правильно! Поздравляю! Для следующего вопроса нажмите «Новый вопрос»."
+        )
+        return ConversationHandler.END
+
+    update.message.reply_text("Неправильно… Попробуешь ещё раз?")
+    return BotStates.QUIZ
+
+
+def handle_give_up(redis_client, questions_answers, update, context):
+    chat_id = update.message.chat_id
+    user_key = f"tg-{chat_id}"
+
+    question = redis_client.get(user_key)
+
+    if not question:
+        update.message.reply_text("Сначала нажмите «Новый вопрос».")
+        return ConversationHandler.END
+
+    correct_answer = questions_answers[question]
+    update.message.reply_text(f"Правильный ответ: {correct_answer}")
+
+    new_question = random.choice(list(questions_answers.keys()))
+    redis_client.set(user_key, new_question)
+    update.message.reply_text(new_question)
+
+    return BotStates.QUIZ
+
+
 def handle_score(update, context):
     update.message.reply_text("Счёт пока не реализован.")
     return BotStates.QUIZ
@@ -48,72 +104,36 @@ def main():
     redis_client = redis.from_url(redis_url, decode_responses=True)
     questions_answers = load_questions_from_directory(questions_path)
 
-    def handle_new_question_request(update, context):
-        chat_id = update.message.chat_id
-        user_key = f"tg-{chat_id}"
-
-        question = random.choice(list(questions_answers.keys()))
-        redis_client.set(user_key, question)
-
-        update.message.reply_text(question)
-        return BotStates.QUIZ
-
-    def handle_solution_attempt(update, context):
-        chat_id = update.message.chat_id
-        user_key = f"tg-{chat_id}"
-        user_answer = update.message.text.strip().lower()
-
-        question = redis_client.get(user_key)
-
-        if not question:
-            update.message.reply_text("Сначала нажмите «Новый вопрос».")
-            return ConversationHandler.END
-
-        correct_answer = questions_answers[question]
-        cleaned_correct_answer = clean_answer(correct_answer)
-
-        if user_answer in cleaned_correct_answer:
-            update.message.reply_text(
-                "Правильно! Поздравляю! Для следующего вопроса нажмите «Новый вопрос»."
-            )
-            return ConversationHandler.END
-
-        update.message.reply_text("Неправильно… Попробуешь ещё раз?")
-        return BotStates.QUIZ
-
-    def handle_give_up(update, context):
-        chat_id = update.message.chat_id
-        user_key = f"tg-{chat_id}"
-
-        question = redis_client.get(user_key)
-
-        if not question:
-            update.message.reply_text("Сначала нажмите «Новый вопрос».")
-            return ConversationHandler.END
-
-        correct_answer = questions_answers[question]
-        update.message.reply_text(f"Правильный ответ: {correct_answer}")
-
-        new_question = random.choice(list(questions_answers.keys()))
-        redis_client.set(user_key, new_question)
-        update.message.reply_text(new_question)
-
-        return BotStates.QUIZ
-
     updater = Updater(tg_token, use_context=True)
     dispatcher = updater.dispatcher
+
+    new_question_handler = partial(
+        handle_new_question_request,
+        redis_client,
+        questions_answers,
+    )
+    solution_attempt_handler = partial(
+        handle_solution_attempt,
+        redis_client,
+        questions_answers,
+    )
+    give_up_handler = partial(
+        handle_give_up,
+        redis_client,
+        questions_answers,
+    )
 
     conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler("start", start),
-            MessageHandler(Filters.regex("^Новый вопрос$"), handle_new_question_request),
+            MessageHandler(Filters.regex("^Новый вопрос$"), new_question_handler),
         ],
         states={
             BotStates.QUIZ: [
-                MessageHandler(Filters.regex("^Новый вопрос$"), handle_new_question_request),
-                MessageHandler(Filters.regex("^Сдаться$"), handle_give_up),
+                MessageHandler(Filters.regex("^Новый вопрос$"), new_question_handler),
+                MessageHandler(Filters.regex("^Сдаться$"), give_up_handler),
                 MessageHandler(Filters.regex("^Мой счёт$"), handle_score),
-                MessageHandler(Filters.text & ~Filters.command, handle_solution_attempt),
+                MessageHandler(Filters.text & ~Filters.command, solution_attempt_handler),
             ],
         },
         fallbacks=[
